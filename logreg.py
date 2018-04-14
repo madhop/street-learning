@@ -40,6 +40,50 @@ w = tf.get_variable('weights', shape = (784, 10),  initializer=tf.random_normal_
 b = tf.get_variable('biases', shape = (1,10), initializer=tf.zeros_initializer())
 
 # Build model to predict
-Y_predicted = 
+logits = tf.matmul(img, w) + b
 
+# loss function
+entropy = tf.nn.softmax_cross_entropy_with_logits(labels = label, logits = logits, name='entropy')
+loss = tf.reduce_mean(entropy, name='loss') # computes the mean over all the examples in the batch
+
+# using gradient descent with learning rate of 0.01 to minimize loss
+optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
+
+# calculate accuracy with test set
+preds = tf.nn.softmax(logits)
+correct_preds = tf.equal(tf.argmax(preds, 1), tf.argmax(label, 1))
+accuracy = tf.reduce_sum(tf.cast(correct_preds, tf.float32))
+
+writer = tf.summary.FileWriter('./graphs/logreg', tf.get_default_graph())
+with tf.Session() as sess:
+    start_time = time.time()
+    sess.run(tf.global_variables_initializer())
+
+    # train the model n_epochs times
+    for i in range(n_epochs):
+        sess.run(train_init)	# drawing samples from train_data
+        total_loss = 0
+        n_batches = 0
+        try:
+            while True:
+                _, l = sess.run([optimizer, loss])
+                total_loss += l
+                n_batches += 1
+        except tf.errors.OutOfRangeError:
+            pass
+        print('Average loss epoch {0}: {1}'.format(i, total_loss/n_batches))
+    print('Total time: {0} seconds'.format(time.time() - start_time))
+
+    #test model
+    sess.run(test_init)
+    total_correct_preds = 0
+    try:
+        while True:
+            accuracy_batch = sess.run(accuracy)
+            total_correct_preds += accuracy_batch
+    except tf.errors.OutOfRangeError:
+        pass
+
+    print('Accuracy {0}'.format(total_correct_preds/n_test))
+writer.close()
 print('TensorFlow')
