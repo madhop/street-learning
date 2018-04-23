@@ -6,3 +6,7 @@ examples/
 *.pyc
 
 graph/
+
+graphs/
+
+checkpoints/
