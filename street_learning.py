@@ -6,43 +6,91 @@ import tensorflow as tf
 from matplotlib import gridspec as gridspec
 from matplotlib import pyplot as plt
 import numpy as np
+import random
 
 EPOCHS = 10
-BATCH_SIZE = 16
+BATCH_SIZE = 2#16
 # create a placeholder to dynamically switch between batch sizes
 batch_size = tf.placeholder(tf.int64)
 
 class StreetLearning:
     def __init__(self):
+        #dataaset
+        self.train_img_path = 'data/kitti_data_road/trainingtraining/inputs' #'data/kitti_data_road/trainingtraining/inputs'
+        self.train_target_img_path = 'data/kitti_data_road/trainingtraining/targets' #'data/kitti_data_road/trainingtraining/targets'
+        self.test_img_path = 'data/kitti_data_road/testingtesting/inputs' #'data/kitti_data_road/testingtesting/inputs'
+        self.test_target_img_path = 'data/kitti_data_road/testingtesting/targets'#'data/kitti_data_road/testingtesting/targets'
+
+        self.input_dim = [1242,375,3]  #[28,28,3]
+        #model
         self.keep_prob = tf.constant(0.75)
         self.training = True
         self.n_classes = 5
-        self.input_dim = [8,8,3]
+
+    def get_dataset(self, img_path, target_img_path):
+        inputs_file_paths = glob.glob(os.path.join(img_path, '*'))
+        #data = []
+        labels = []
+        for input_file_path in inputs_file_paths:
+            #Extract target filepath
+            file_header = input_file_path.split("/")[-1].split("_")[0]
+            file_number = input_file_path.split("_")[-1]
+            target_file_path = target_img_path + "/" + file_header + '_'
+            if file_header == 'um':
+                target_file_path += 'lane_'
+            else:
+                target_file_path += 'road_'
+            target_file_path += file_number
+            #Load image
+            #input_img = self.read_one_image(input_file_path)
+            #target_img = self.read_one_image(target_file_path)
+            #input_img = tf.expand_dims(input_img, 0)
+            #target_img = tf.expand_dims(target_img, 0)
+            #with tf.Session() as sess:
+                #input_img, target_img = sess.run([input_img, target_img])
+            #data.append(input_img)
+            labels.append([1]*self.n_classes)#(target_file_path)  #np.random.sample(self.n_classes) #[random.randint(0,self.n_classes-1)]*self.n_classes
+
+        #data = np.asarray(data)
+        #labels = np.asarray(labels)
+
+        filenames = tf.constant(inputs_file_paths)
+        labels = tf.constant(labels)
+        return (filenames, labels)
+
+    def _parse_function(self, filename, label):
+        image_string = tf.read_file(filename)
+        #image_decoded = tf.image.decode_image(image_string)
+        image_decoded = tf.image.decode_jpeg(image_string)  #image_decoded = tf.image.decode_png(image_string)
+        image_resized = tf.reshape(image_decoded, self.input_dim)
+        image_flaot32 = tf.image.convert_image_dtype(image_resized, dtype = tf.float32)
+        return image_flaot32, label
 
     def get_data(self):
-        '''shape = [None]+self.input_dim
-        self.x, self.y = tf.placeholder(tf.float32, shape = shape ), tf.placeholder(tf.float32, shape=[None,self.n_classes])
-        dataset = tf.data.Dataset.from_tensor_slices((self.x, self.y)).batch(batch_size).repeat()'''
-
         # using two numpy arrays
+        '''
         train_shape = [100] + self.input_dim
         train_shape = tuple(train_shape)
         test_shape = [20] + self.input_dim
         test_shape = tuple(test_shape)
         train = (np.random.sample(train_shape).astype(np.float32), np.random.sample((100,self.n_classes)).astype(np.float32))
-        self.train_len = len(train[0])
         test = (np.random.sample(test_shape).astype(np.float32), np.random.sample((20,self.n_classes)).astype(np.float32))
+        '''
+        self.train_data = self.get_dataset(self.train_img_path, self.train_target_img_path)   # tuple of (inputs filenames, labels)
+        test_data = self.get_dataset(self.test_img_path, self.test_target_img_path)  # tuple of (inputs filenames, labels)
 
-        train_data = tf.data.Dataset.from_tensor_slices(train).shuffle(10000).batch(BATCH_SIZE).repeat()
-        test_data = tf.data.Dataset.from_tensor_slices(test).batch(test[0].shape[0]).repeat()
+        train_dataset = tf.data.Dataset.from_tensor_slices(self.train_data)
+        train_dataset = train_dataset.map(self._parse_function).batch(BATCH_SIZE).repeat()
+        test_dataset = tf.data.Dataset.from_tensor_slices(test_data)
+        test_dataset = test_dataset.map(self._parse_function).batch(test_data[0].shape[0]).repeat()
 
         #iterator
-        iterator = tf.data.Iterator.from_structure(train_data.output_types,train_data.output_shapes)
+        iterator = tf.data.Iterator.from_structure(train_dataset.output_types,train_dataset.output_shapes)
         self.features, self.labels = iterator.get_next()
 
         #init
-        self.train_init = iterator.make_initializer(train_data)  # initializer for train_data
-        self.test_init = iterator.make_initializer(test_data)    # initializer for test_data
+        self.train_init = iterator.make_initializer(train_dataset)  # initializer for train_dataset
+        self.test_init = iterator.make_initializer(test_dataset)    # initializer for test_dataset
 
     def model(self):
         conv1 = tf.layers.conv2d(inputs=self.features,
@@ -82,9 +130,12 @@ class StreetLearning:
         self.train_op = tf.train.AdamOptimizer().minimize(self.loss)
 
     def train(self):
-        n_batches = self.train_len // BATCH_SIZE
         with tf.Session() as sess:
+            print('in the session')
+            train_len = 16#sess.run(tf.shape(self.train_data)[0])
+            n_batches = train_len // BATCH_SIZE
             sess.run(tf.global_variables_initializer())
+            print('variables initialized')
             # initialise iterator with train data
             sess.run(self.train_init)
             print('Training...')
