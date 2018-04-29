@@ -16,12 +16,12 @@ batch_size = tf.placeholder(tf.int64)
 class StreetLearning:
     def __init__(self):
         #dataaset
-        self.train_img_path = 'data/kitti_data_road/trainingtraining/inputs' #'data/kitti_data_road/trainingtraining/inputs'
-        self.train_target_img_path = 'data/kitti_data_road/trainingtraining/targets' #'data/kitti_data_road/trainingtraining/targets'
-        self.test_img_path = 'data/kitti_data_road/testingtesting/inputs' #'data/kitti_data_road/testingtesting/inputs'
-        self.test_target_img_path = 'data/kitti_data_road/testingtesting/targets'#'data/kitti_data_road/testingtesting/targets'
+        self.train_img_path = 'data/kitti_data_road/trainingtraining/inputs' #'data/einstein/trainingtraining/inputs'
+        self.train_target_img_path = 'data/kitti_data_road/trainingtraining/targets' #'data/einstein/trainingtraining/targets'
+        self.test_img_path = 'data/kitti_data_road/testingtesting/inputs' #'data/einstein/testingtesting/inputs'
+        self.test_target_img_path = 'data/kitti_data_road/testingtesting/targets'#'data/einstein/testingtesting/targets'
 
-        self.input_dim = [1242,375,3]  #[28,28,3]
+        self.input_dim = [1242,375,3]  #[28,28,3] #this must be the right size of the images
         #model
         self.keep_prob = tf.constant(0.75)
         self.training = True
