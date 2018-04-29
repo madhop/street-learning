@@ -6,9 +6,21 @@ import urllib
 
 os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
 
+from matplotlib import gridspec as gridspec
 from matplotlib import pyplot as plt
 import numpy as np
 import tensorflow as tf
+import glob
+
+
+def read_one_image(filename):
+    ''' This method is to show how to read image from a file into a tensor.
+    The output is a tensor object.
+    '''
+    image_string = tf.read_file(filename)
+    image_decoded = tf.image.decode_image(image_string)
+    image = tf.cast(image_decoded, tf.float32) / 256.0
+    return image
 
 def huber_loss(labels, predictions, delta=14.0):
     residual = tf.abs(labels - predictions)
@@ -38,14 +50,14 @@ def read_birth_life_data(filename):
     data = np.asarray(data, dtype=np.float32)
     return data, n_samples
 
-def download_one_file(download_url, 
-                    local_dest, 
-                    expected_byte=None, 
+def download_one_file(download_url,
+                    local_dest,
+                    expected_byte=None,
                     unzip_and_remove=False):
-    """ 
+    """
     Download the file from download_url into local_dest
     if the file doesn't already exists.
-    If expected_byte is provided, check if 
+    If expected_byte is provided, check if
     the downloaded file has the same number of bytes.
     If unzip_and_remove is True, unzip the file and remove the zip file
     """
@@ -66,8 +78,8 @@ def download_one_file(download_url,
                 print('The downloaded file has unexpected number of bytes')
 
 def download_mnist(path):
-    """ 
-    Download and unzip the dataset mnist if it's not already downloaded 
+    """
+    Download and unzip the dataset mnist if it's not already downloaded
     Download from http://yann.lecun.com/exdb/mnist
     """
     safe_mkdir(path)
@@ -93,7 +105,7 @@ def parse_data(path, dataset, flatten):
         labels = np.fromfile(file, dtype=np.int8) #int8
         new_labels = np.zeros((num, 10))
         new_labels[np.arange(num), labels] = 1
-    
+
     img_file = os.path.join(path, dataset + '-images-idx3-ubyte')
     with open(img_file, 'rb') as file:
         _, num, rows, cols = struct.unpack(">IIII", file.read(16))
@@ -116,7 +128,46 @@ def read_mnist(path, flatten=True, num_train=55000):
     train_img, train_labels = imgs[train_idx, :], labels[train_idx, :]
     val_img, val_labels = imgs[val_idx, :], labels[val_idx, :]
     test = parse_data(path, 't10k', flatten)
+    print('***** type(train_img)', type(train_img))
+    print('***** np.shape(train_img)', np.shape(train_img))
+    print('***** type(train_img[0])', type(train_img[0]))
+    print('***** np.shape(train_img[0])', np.shape(train_img[0]))
     return (train_img, train_labels), (val_img, val_labels), test
+
+
+def read_kitti_data_road(path):
+    inputs_file_paths = glob.glob(os.path.join(path, '*'))
+    train_data = []
+    labels = []
+    for input_file_path in inputs_file_paths:
+        '''#Extract target filepath
+        file_header = input_file_path.split("/")[-1].split("_")[0]
+        file_number = input_file_path.split("_")[-1]
+        target_file_path = self.target_img_path + "/" + file_header + '_'
+        if file_header == 'um':
+            target_file_path += 'lane_'
+        else:
+            target_file_path += 'road_'
+        target_file_path += file_number'''
+        #Load image
+        input_img = read_one_image(input_file_path)
+        #target_img = self.read_one_image(target_file_path)
+        #input_img = tf.expand_dims(input_img, 0)
+        #target_img = tf.expand_dims(target_img, 0)
+        with tf.Session() as sess:
+            #input_img, target_img = sess.run([input_img, target_img])
+            input_img = sess.run(input_img)
+        train_data.append(input_img)
+        labels.append([1,0])
+        #target_data.append(0)#(target_img)
+        #self.label = 0
+    train_data = np.asarray(train_data)
+    labels = np.asarray(labels)
+    print('**** type(train_data):', type(train_data))
+    print('**** np.shape(train_data):', np.shape(train_data))
+    print('**** np.shape(labels):', np.shape(labels))
+
+    return (train_data, labels)
 
 def get_mnist_dataset(batch_size):
     # Step 1: Read in data
@@ -133,10 +184,22 @@ def get_mnist_dataset(batch_size):
     test_data = test_data.batch(batch_size)
 
     return train_data, test_data
-    
+
 def show(image):
     """
     Render a given numpy.uint8 2D array of pixel data.
     """
     plt.imshow(image, cmap='gray')
+    plt.show()
+
+def show_images(images, rgb=True):
+    gs = gridspec.GridSpec(1, len(images))
+    for i, image in enumerate(images):
+        plt.subplot(gs[0, i])
+        if rgb:
+            plt.imshow(image)
+        else:
+            image = image.reshape(image.shape[0], image.shape[1])
+            plt.imshow(image, cmap='gray')
+        plt.axis('off')
     plt.show()

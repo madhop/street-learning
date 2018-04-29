@@ -57,8 +57,8 @@ class StreetLearning:
             #Load image
             input_img = self.read_one_image(input_file_path)
             target_img = self.read_one_image(target_file_path)
-            input_img = tf.expand_dims(input_img, 0)
-            target_img = tf.expand_dims(target_img, 0)
+            #input_img = tf.expand_dims(input_img, 0)
+            #target_img = tf.expand_dims(target_img, 0)
             with tf.Session() as sess:
                 input_img, target_img = sess.run([input_img, target_img])
             train_data.append(input_img)
