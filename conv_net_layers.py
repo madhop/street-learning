@@ -35,7 +35,7 @@ class ConvNet(object):
             # reshape the image to make it work with tf.nn.conv2d
 
             self.train_init = iterator.make_initializer(train_data)  # initializer for train_data
-            self.test_init = iterator.make_initializer(test_data)    # initializer for train_data
+            self.test_init = iterator.make_initializer(test_data)    # initializer for test_data
 
     def inference(self):
         net = tf.layers.dense(self.img, 8, activation=tf.tanh) # pass the first value from iter.get_next() as input
