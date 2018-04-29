@@ -81,6 +81,7 @@ def main():
     image = tf.expand_dims(image, 0) # make it into a batch of 1 element
     images = convolve(image, kernels_list, rgb)
     with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
         images = sess.run(images) # convert images from tensors to float values
     show_images(images, rgb)
 
