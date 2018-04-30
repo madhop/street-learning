@@ -14,17 +14,17 @@ BATCH_SIZE = 2#16
 class StreetLearning:
     def __init__(self):
         #dataaset
-        dataset_name = 'kitti_data_road' #'einstein'
+        dataset_name = 'einstein' #'kitti_data_road'
         self.train_img_path = 'data/' + dataset_name + '/trainingtraining/inputs'
         self.train_target_img_path = 'data/' + dataset_name + '/trainingtraining/targets'
         self.test_img_path = 'data/' + dataset_name + '/testingtesting/inputs'
         self.test_target_img_path = 'data/' + dataset_name + '/testingtesting/targets'
 
-        self.input_dim = [1242,375,3] #[28,28,3] #this must be the right size of the images
-        self.resized_dim = [92,28]
+        self.input_dim = [28,28,3] #[1242,375,3] #this must be the right size of the images
+        self.resized_dim = [28,28]#[92,28]
         #model
         self.keep_prob = tf.constant(0.75)
-        self.training = True
+        self.training = False
         self.n_classes = 2
 
     def get_dataset(self, img_path, target_img_path):
@@ -43,10 +43,12 @@ class StreetLearning:
             target_file_path = target_img_path + "/" + file_header + '_'
             if file_header == 'um':
                 target_file_path += 'lane_'
+                labels.append([1,0])
             else:
+                labels.append([0,1])
                 target_file_path += 'road_'
             target_file_path += file_number
-            labels.append([1]*self.n_classes)#(target_file_path)  #np.random.sample(self.n_classes) #[random.randint(0,self.n_classes-1)]*self.n_classes
+            #labels.append([1]*self.n_classes)#(target_file_path)  #np.random.sample(self.n_classes) #[random.randint(0,self.n_classes-1)]*self.n_classes
 
         filenames = tf.constant(inputs_file_paths)
         labels = tf.constant(labels)
@@ -82,9 +84,10 @@ class StreetLearning:
         '''
         Function to build the neural net
         '''
+        # Encode
         conv1 = tf.layers.conv2d(inputs=self.features,
                                   filters=32,
-                                  kernel_size=[5, 5],
+                                  kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   name='conv1')
@@ -94,7 +97,7 @@ class StreetLearning:
                                         name='pool1')
         conv2 = tf.layers.conv2d(inputs=pool1,
                                   filters=64,
-                                  kernel_size=[5, 5],
+                                  kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   name='conv2')
@@ -102,13 +105,47 @@ class StreetLearning:
                                         pool_size=[2, 2],
                                         strides=2,
                                         name='pool2')
-        feature_dim = pool2.shape[1] * pool2.shape[2] * pool2.shape[3]
-        pool2 = tf.reshape(pool2, [-1, feature_dim])
-        fc = tf.layers.dense(pool2, 1024, activation=tf.nn.relu, name='fc')
-        dropout = tf.layers.dropout(fc,
-                                    self.keep_prob,
-                                    training=self.training,
-                                    name='dropout')
+        conv3 = tf.layers.conv2d(inputs=pool2,
+                                  filters=128,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  name='conv3')
+        # Decode
+        #unpool1 = tf.keras.layers.UpSampling2D(size = (conv3.shape[1]*2, conv3.shape[2]*2))(conv3)
+        unpool1 = tf.layers.conv2d_transpose(inputs=conv3,
+                                            filters=128,    #TODO conv2d_transpose o conv2d
+                                            kernel_size=[2, 2],
+                                            strides=[1, 2, 2, 1],
+                                            padding='SAME',
+                                            activation=tf.nn.relu,
+                                            name='unpool1')
+        deconv1 = tf.layers.conv2d(inputs=unpool1,
+                                  filters=64,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  name='deconv1')
+        unpool2 = tf.layers.conv2d_transpose(inputs=deconv1,
+                                            filters=64,
+                                            kernel_size=[2, 2],
+                                            strides=[1, 2, 2, 1],
+                                            padding='SAME',
+                                            activation=tf.nn.relu,
+                                            name='unpool2')
+        deconv2 = tf.layers.conv2d(inputs=unpool2,
+                                  filters=32,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  name='deconv2')
+        deconv3 = tf.layers.conv2d(inputs=deconv2,
+                                  filters=1,
+                                  kernel_size=[1, 1],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  name='deconv3')
+        # TODO SOFTMAX
         self.logits = tf.layers.dense(dropout, self.n_classes, name='logits')
 
     def loss(self):
@@ -127,6 +164,7 @@ class StreetLearning:
     def train(self):
         with tf.Session() as sess:
             print('in the session')
+            self.training = True
             train_len = len(glob.glob(os.path.join(self.train_img_path, '*')))
             n_batches = train_len // BATCH_SIZE
             sess.run(tf.global_variables_initializer())
@@ -140,6 +178,7 @@ class StreetLearning:
                     _, loss_value = sess.run([self.train_op, self.loss])
                     tot_loss += loss_value
                 print("Iter: {}, Loss: {:.4f}".format(i, tot_loss / n_batches))
+            self.training = False
             # initialise iterator with test data
             sess.run(self.test_init)
             print('Test Loss: {:4f}'.format(sess.run(self.loss)))

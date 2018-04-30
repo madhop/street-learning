@@ -24,7 +24,7 @@ class StreetLearning:
         self.resized_dim = [28,28]#[92,28]
         #model
         self.keep_prob = tf.constant(0.75)
-        self.training = True
+        self.training = False
         self.n_classes = 2
 
     def get_dataset(self, img_path, target_img_path):
@@ -129,6 +129,7 @@ class StreetLearning:
     def train(self):
         with tf.Session() as sess:
             print('in the session')
+            self.training = True
             train_len = len(glob.glob(os.path.join(self.train_img_path, '*')))
             n_batches = train_len // BATCH_SIZE
             sess.run(tf.global_variables_initializer())
@@ -142,6 +143,7 @@ class StreetLearning:
                     _, loss_value = sess.run([self.train_op, self.loss])
                     tot_loss += loss_value
                 print("Iter: {}, Loss: {:.4f}".format(i, tot_loss / n_batches))
+            self.training = False
             # initialise iterator with test data
             sess.run(self.test_init)
             print('Test Loss: {:4f}'.format(sess.run(self.loss)))
