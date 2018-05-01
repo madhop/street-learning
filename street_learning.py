@@ -13,19 +13,34 @@ BATCH_SIZE = 2#16
 
 class StreetLearning:
     def __init__(self):
-        #dataaset
-        dataset_name = 'einstein' #'kitti_data_road'
+        #dataset
+        dataset_name = 'kitti_data_road' #'einstein'
         self.train_img_path = 'data/' + dataset_name + '/trainingtraining/inputs'
         self.train_target_img_path = 'data/' + dataset_name + '/trainingtraining/targets'
         self.test_img_path = 'data/' + dataset_name + '/testingtesting/inputs'
         self.test_target_img_path = 'data/' + dataset_name + '/testingtesting/targets'
+        self.rgb = True
 
-        self.input_dim = [28,28,3] #[1242,375,3] #this must be the right size of the images
-        self.resized_dim = [28,28]#[92,28]
+        self.input_dim =  [375,1242,3]#[28,28,3] #this must be the right size of the images
+        self.resized_dim = [28,92]#[28,28]
         #model
         self.keep_prob = tf.constant(0.75)
         self.training = False
         self.n_classes = 2
+
+
+
+    def show_images(self, images):
+        gs = gridspec.GridSpec(1, len(images))
+        for i, image in enumerate(images):
+            plt.subplot(gs[0, i])
+            if self.rgb:
+                plt.imshow(image)
+            else:
+                image = image.reshape(image.shape[0], image.shape[1])
+                plt.imshow(image, cmap='gray')
+            plt.axis('off')
+        plt.show()
 
     def get_dataset(self, img_path, target_img_path):
         '''
@@ -43,24 +58,31 @@ class StreetLearning:
             target_file_path = target_img_path + "/" + file_header + '_'
             if file_header == 'um':
                 target_file_path += 'lane_'
-                labels.append([1,0])
+                #labels.append([1,0])
             else:
-                labels.append([0,1])
+                #labels.append([0,1])
                 target_file_path += 'road_'
             target_file_path += file_number
-            #labels.append([1]*self.n_classes)#(target_file_path)  #np.random.sample(self.n_classes) #[random.randint(0,self.n_classes-1)]*self.n_classes
+            labels.append(target_file_path)  #np.random.sample(self.n_classes) #[random.randint(0,self.n_classes-1)]*self.n_classes
 
         filenames = tf.constant(inputs_file_paths)
         labels = tf.constant(labels)
         return (filenames, labels)
 
-    def _parse_function(self, filename, label):
+    def _parse_function(self, filename, label_path):
+        # image
         image_string = tf.read_file(filename)
         image_decoded = tf.image.decode_jpeg(image_string)  #image_decoded = tf.image.decode_png(image_string)
         image_reshaped = tf.reshape(image_decoded, self.input_dim)
         image_resized = tf.image.resize_images(image_reshaped, self.resized_dim)
         image_float32 = tf.image.convert_image_dtype(image_resized, dtype = tf.float32)
-        return image_float32, label
+        # label
+        label_string = tf.read_file(filename)
+        label_decoded = tf.image.decode_jpeg(label_string)  #image_decoded = tf.image.decode_png(image_string)
+        label_reshaped = tf.reshape(label_decoded, self.input_dim)
+        label_resized = tf.image.resize_images(label_reshaped, self.resized_dim)
+        label_float32 = tf.image.convert_image_dtype(label_resized, dtype = tf.float32)
+        return image_float32, label_float32
 
     def get_data(self):
         # using two numpy arrays
@@ -112,11 +134,10 @@ class StreetLearning:
                                   activation=tf.nn.relu,
                                   name='conv3')
         # Decode
-        #unpool1 = tf.keras.layers.UpSampling2D(size = (conv3.shape[1]*2, conv3.shape[2]*2))(conv3)
         unpool1 = tf.layers.conv2d_transpose(inputs=conv3,
-                                            filters=128,    #TODO conv2d_transpose o conv2d
+                                            filters=128,
                                             kernel_size=[2, 2],
-                                            strides=[1, 2, 2, 1],
+                                            strides=(2,2),
                                             padding='SAME',
                                             activation=tf.nn.relu,
                                             name='unpool1')
@@ -129,7 +150,7 @@ class StreetLearning:
         unpool2 = tf.layers.conv2d_transpose(inputs=deconv1,
                                             filters=64,
                                             kernel_size=[2, 2],
-                                            strides=[1, 2, 2, 1],
+                                            strides=(2,2),
                                             padding='SAME',
                                             activation=tf.nn.relu,
                                             name='unpool2')
@@ -140,19 +161,20 @@ class StreetLearning:
                                   activation=tf.nn.relu,
                                   name='deconv2')
         deconv3 = tf.layers.conv2d(inputs=deconv2,
-                                  filters=1,
+                                  filters=3,
                                   kernel_size=[1, 1],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   name='deconv3')
         # TODO SOFTMAX
-        self.logits = tf.layers.dense(dropout, self.n_classes, name='logits')
+        #self.logits = tf.layers.dense(deconv3, self.n_classes, name='logits')
+        self.segmentation_result = tf.sigmoid(deconv3)
 
     def loss(self):
         '''
         Loss function
         '''
-        entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.labels, logits=self.logits)
+        entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.labels, logits=self.segmentation_result)
         self.loss = tf.reduce_mean(entropy, name='loss')
 
     def optimizer(self):
@@ -162,6 +184,10 @@ class StreetLearning:
         self.train_op = tf.train.AdamOptimizer().minimize(self.loss)
 
     def train(self):
+        image_uint8 = tf.image.convert_image_dtype(self.segmentation_result[0], dtype = tf.uint8)
+        img = tf.image.encode_jpeg(image_uint8)
+        #self.show_images([self.segmentation_result])
+        save_img_op = tf.write_file('data/seg_out.jpeg',img)
         with tf.Session() as sess:
             print('in the session')
             self.training = True
@@ -182,6 +208,10 @@ class StreetLearning:
             # initialise iterator with test data
             sess.run(self.test_init)
             print('Test Loss: {:4f}'.format(sess.run(self.loss)))
+            #plot_img = sess.run(self.segmentation_result)
+            sess.run(save_img_op)
+
+
 
 
 if __name__ == '__main__':
