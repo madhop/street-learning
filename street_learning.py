@@ -7,6 +7,7 @@ from matplotlib import gridspec as gridspec
 from matplotlib import pyplot as plt
 import numpy as np
 import random
+import scipy.misc
 
 EPOCHS = 50
 BATCH_SIZE = 8
@@ -28,7 +29,8 @@ class StreetLearning:
         #label
         self.color_table = [[255,0,0],      # no_street
                             [255,0,255],    # street
-                            [0,0,0]]        # something black
+                            [0,0,0],
+                            [200,200,200]]        # something black
         self.n_classes = len(self.color_table)
 
     def get_dataset(self, img_path, target_img_path):
@@ -58,19 +60,18 @@ class StreetLearning:
         labels = tf.constant(labels)
         return (filenames, labels)
 
-    def encode_label(self, label):
-        color_mat = tf.constant(self.color_table, dtype=tf.float32)
-        raw_output_up = tf.argmax(label, axis=2)
-        onehot_output = tf.one_hot(raw_output_up, depth=self.n_classes)
-        onehot_output = tf.reshape(onehot_output, (-1, self.n_classes))
-        pred = tf.matmul(onehot_output, color_mat)
-        pred = tf.reshape(pred, (label.shape[0], label.shape[1], 3))
-        return pred
+    def encode_label(self, semantic_map):
+        palette = tf.constant(self.color_table, dtype=tf.uint8)
+        class_indexes = tf.argmax(semantic_map, axis=-1)
+        class_indexes = tf.reshape(class_indexes, [-1])
+        color_image = tf.gather(palette, class_indexes)
+        color_image = tf.reshape(color_image, [self.resized_dim[0], self.resized_dim[1], 3])
+        return color_image
 
-    def decode_label(self, label, img_shape):
+    def decode_label(self, label):
         semantic_map = []
-        for color in self.color_table:
-            class_map = tf.reduce_all(tf.equal(label, color), axis=-1)
+        for colour in self.color_table:
+            class_map = tf.reduce_all(tf.equal(label, colour), axis=-1)
             semantic_map.append(class_map)
         semantic_map = tf.stack(semantic_map, axis=-1)
         semantic_map = tf.cast(semantic_map, tf.float32)
@@ -84,12 +85,11 @@ class StreetLearning:
         image_resized = tf.image.resize_images(image_reshaped, self.resized_dim)
         image = tf.image.convert_image_dtype(image_resized, dtype = tf.float32)
         # label
-        label_string = tf.read_file(filename)
+        label_string = tf.read_file(label_path)
         label_decoded = tf.image.decode_jpeg(label_string)  #image_decoded = tf.image.decode_png(image_string)
         label_reshaped = tf.reshape(label_decoded, self.input_dim)
         label_resized = tf.image.resize_images(label_reshaped, self.resized_dim)
-        label_uint8 = tf.image.convert_image_dtype(label_resized, dtype = tf.uint8)
-        label = self.decode_label(label_uint8, tf.shape(label_uint8))
+        label = self.decode_label(label_resized)
         return image, label
 
     def get_data(self):
@@ -190,9 +190,9 @@ class StreetLearning:
         '''
         Loss function
         '''
-        #self.loss = tf.sqrt(tf.reduce_mean(tf.square(self.segmentation_result - self.labels)))
-        entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.labels, logits=self.segmentation_result)
-        self.loss = tf.reduce_mean(entropy, name='loss')
+        self.loss = tf.sqrt(tf.reduce_mean(tf.square(self.segmentation_result - self.labels)))
+        #entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.labels, logits=self.segmentation_result)
+        #self.loss = tf.reduce_mean(entropy, name='loss')
 
     def optimizer(self):
         '''
@@ -223,13 +223,39 @@ class StreetLearning:
                     _, loss_value = sess.run([self.train_op, self.loss])
                     tot_loss += loss_value
                 print("Iter: {}, Loss: {:.4f}".format(i, tot_loss / n_batches))
+                sess.run(save_img_op)
 
             # initialise iterator with test data
             #sess.run(self.test_init)
             #self.training = False
-            sess.run(save_img_op)
             #print('Test Loss: {:4f}'.format(sess.run(self.loss)))
             #sess.run(save_img_op)
+
+    def testtest(self):
+        img = scipy.misc.imread('data/kitti_data_road/train/targets/0.png', mode = 'RGB')
+        label_reshaped = tf.reshape(img, self.input_dim)
+        label_resized = tf.image.resize_images(label_reshaped, self.resized_dim)
+        #scipy.misc.imsave('data/testtest.png', img)
+        print('***fatto')
+        #decode
+        semantic_map = self.decode_label(label_resized)
+        #encode
+        color_image = self.encode_label(semantic_map)
+
+
+        with tf.Session() as sess:
+            #magic_number_val = sess.run(magic_number)
+            color_image_val = sess.run(color_image)
+            scipy.misc.imsave('data/testtest.png', color_image_val)
+            '''train_len = len(glob.glob(os.path.join(self.train_img_path, '*')))
+            n_batches = train_len // BATCH_SIZE
+            sess.run(self.train_init)
+            for _ in range(n_batches):
+                sess.run(save_img_op)
+                input('go to next')'''
+
+        print('LABEL')
+
 
 
 if __name__ == '__main__':
@@ -239,3 +265,4 @@ if __name__ == '__main__':
     sl.loss()
     sl.optimizer()
     sl.train()
+    #sl.testtest()
