@@ -9,7 +9,7 @@ import numpy as np
 import random
 import scipy.misc
 
-EPOCHS = 30
+EPOCHS = 20
 BATCH_SIZE = 8
 
 class StreetLearning:
@@ -22,15 +22,14 @@ class StreetLearning:
         self.test_target_img_path = 'data/' + dataset_name + '/test/targets'
 
         self.input_dim =  [320, 1024,3]#[375,1242,3]#[28,28,3] #this must be the right size of the images
-        self.resized_dim = [80, 256]#[28,92]#[28,92]#[28,28]
+        self.resized_dim = [160, 512]#[80, 256]#[28,92]#[28,92]#[28,28]
         #model
         self.keep_prob = tf.constant(0.75)
         self.training = False
         #label
         self.color_table = [[255,0,0],      # no_street
                             [255,0,255],    # street
-                            [0,0,0],
-                            [200,200,200]]        # something black
+                            [0,0,0]]        # something black
         self.n_classes = len(self.color_table)
 
     def get_dataset(self, img_path, target_img_path):
@@ -211,15 +210,14 @@ class StreetLearning:
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='deconv2_2')
-        self.segmentation_result = tf.layers.conv2d(inputs=deconv2_2,
+        deconv3 = tf.layers.conv2d(inputs=deconv2_2,
                                   filters=self.n_classes,
                                   kernel_size=[1, 1],
                                   padding='SAME',
                                   activation=tf.sigmoid,
                                   trainable=self.training,
                                   name='deconv3')
-        # TODO SOFTMAX
-        #self.segmentation_result = tf.nn.softmax(deconv2)
+        self.segmentation_result = tf.nn.softmax(deconv3)
         #self.logits = tf.layers.dense(deconv3, self.n_classes, name='logits')
         #self.segmentation_result = tf.sigmoid(deconv3)
 
@@ -256,11 +254,14 @@ class StreetLearning:
             print('Training...')
             start = time.time()
             for i in range(EPOCHS):
+                start_epoc = time.time()
                 tot_loss = 0
                 for _ in range(n_batches):
                     _, loss_value = sess.run([self.train_op, self.loss])
                     tot_loss += loss_value
                 print("Iter: {}, Loss: {:.4f}".format(i, tot_loss / n_batches))
+                end_epoc = time.time()
+                print('This epoc took', end_epoc-start, 's')
                 sess.run(save_img_op)
             end = time.time()
             print('Training took', end-start, 's')
