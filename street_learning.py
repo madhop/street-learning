@@ -9,8 +9,8 @@ import numpy as np
 import random
 import scipy.misc
 
-EPOCHS = 20
-BATCH_SIZE = 8
+EPOCHS = 40
+BATCH_SIZE = 16
 
 class StreetLearning:
     def __init__(self):
@@ -22,7 +22,7 @@ class StreetLearning:
         self.test_target_img_path = 'data/' + dataset_name + '/test/targets'
 
         self.input_dim =  [320, 1024,3]#[375,1242,3]#[28,28,3] #this must be the right size of the images
-        self.resized_dim = [160, 512]#[80, 256]#[28,92]#[28,92]#[28,28]
+        self.resized_dim = [80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
         #model
         self.keep_prob = tf.constant(0.75)
         self.training = False
@@ -85,7 +85,7 @@ class StreetLearning:
         image = tf.image.convert_image_dtype(image_resized, dtype = tf.float32)
         # label
         label_string = tf.read_file(label_path)
-        label_decoded = tf.image.decode_jpeg(label_string)  #image_decoded = tf.image.decode_png(image_string)
+        label_decoded = tf.image.decode_png(label_string)  #image_decoded = tf.image.decode_png(image_string)
         label_reshaped = tf.reshape(label_decoded, self.input_dim)
         label_resized = tf.image.resize_images(label_reshaped, self.resized_dim)
         label = self.decode_label(label_resized)
@@ -114,6 +114,7 @@ class StreetLearning:
         Function to build the neural net
         '''
         # Encode
+        # e1
         conv1_1 = tf.layers.conv2d(inputs=self.features,
                                   filters=32,
                                   kernel_size=[3, 3],
@@ -132,7 +133,7 @@ class StreetLearning:
                                         pool_size=[2, 2],
                                         strides=2,
                                         name='pool1')
-
+        # e2
         conv2_1 = tf.layers.conv2d(inputs=pool1,
                                   filters=64,
                                   kernel_size=[3, 3],
@@ -151,7 +152,7 @@ class StreetLearning:
                                         pool_size=[2, 2],
                                         strides=2,
                                         name='pool2')
-
+        # e3
         conv3_1 = tf.layers.conv2d(inputs=pool2,
                                   filters=128,
                                   kernel_size=[3, 3],
@@ -159,37 +160,58 @@ class StreetLearning:
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='conv3_1')
-        conv3_2 = tf.layers.conv2d(inputs=pool2,
+        conv3_2 = tf.layers.conv2d(inputs=conv3_1,
                                   filters=128,
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='conv3_2')
+        pool3 = tf.layers.max_pooling2d(inputs=conv3_2,
+                                        pool_size=[2, 2],
+                                        strides=2,
+                                        name='pool3')
+        # e4
+        conv4_1 = tf.layers.conv2d(inputs=pool3,
+                                  filters=256,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  trainable=self.training,
+                                  name='conv4_1')
+        conv4_2 = tf.layers.conv2d(inputs=conv4_1,
+                                  filters=256,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  trainable=self.training,
+                                  name='conv4_2')
         # Decode
-        unpool1 = tf.layers.conv2d_transpose(inputs=conv3_2,
-                                            filters=128,
+        # d1
+        unpool1 = tf.layers.conv2d_transpose(inputs=conv4_2,
+                                            filters=256,
                                             kernel_size=[2, 2],
                                             strides=(2,2),
                                             padding='SAME',
                                             activation=tf.nn.relu,
                                             name='unpool1')
         deconv1_1 = tf.layers.conv2d(inputs=unpool1,
-                                  filters=64,
+                                  filters=128,
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='deconv1_1')
         deconv1_2 = tf.layers.conv2d(inputs=deconv1_1,
-                                  filters=64,
+                                  filters=128,
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='deconv1_2')
+        # d2
         unpool2 = tf.layers.conv2d_transpose(inputs=deconv1_2,
-                                            filters=64,
+                                            filters=128,
                                             kernel_size=[2, 2],
                                             strides=(2,2),
                                             padding='SAME',
@@ -197,29 +219,51 @@ class StreetLearning:
                                             trainable=self.training,
                                             name='unpool2')
         deconv2_1 = tf.layers.conv2d(inputs=unpool2,
-                                  filters=32,
+                                  filters=64,
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='deconv2_1')
         deconv2_2 = tf.layers.conv2d(inputs=deconv2_1,
-                                  filters=32,
+                                  filters=64,
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='deconv2_2')
-        deconv3 = tf.layers.conv2d(inputs=deconv2_2,
+        # d3
+        unpool3 = tf.layers.conv2d_transpose(inputs=deconv2_2,
+                                            filters=64,
+                                            kernel_size=[2, 2],
+                                            strides=(2,2),
+                                            padding='SAME',
+                                            activation=tf.nn.relu,
+                                            trainable=self.training,
+                                            name='unpool3')
+        deconv3_1 = tf.layers.conv2d(inputs=unpool3,
+                                  filters=32,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  trainable=self.training,
+                                  name='deconv3_1')
+        deconv3_2 = tf.layers.conv2d(inputs=deconv3_1,
+                                  filters=32,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  trainable=self.training,
+                                  name='deconv3_2')
+        # Sigmoid and Softmax
+        sigmoid = tf.layers.conv2d(inputs=deconv3_2,
                                   filters=self.n_classes,
                                   kernel_size=[1, 1],
                                   padding='SAME',
                                   activation=tf.sigmoid,
                                   trainable=self.training,
-                                  name='deconv3')
-        self.segmentation_result = tf.nn.softmax(deconv3)
-        #self.logits = tf.layers.dense(deconv3, self.n_classes, name='logits')
-        #self.segmentation_result = tf.sigmoid(deconv3)
+                                  name='sigmoid')
+        self.segmentation_result = tf.nn.softmax(sigmoid)
 
     def loss(self):
         '''
@@ -240,17 +284,19 @@ class StreetLearning:
         img_encoded = self.encode_label(image_int32)
         image_uint8 = tf.image.convert_image_dtype(img_encoded, dtype = tf.uint8)
         img = tf.image.encode_jpeg(image_uint8)
-        save_img_op = tf.write_file('data/seg_out.jpeg',img)
+
         with tf.Session() as sess:
             print('in the session')
-            #print('The shape:', sess.run(tf.shape(self.thing_we_want_the_shape_of)))
+            sess.run(tf.global_variables_initializer())
+
             self.training = True
+
             train_len = len(glob.glob(os.path.join(self.train_img_path, '*')))
             n_batches = train_len // BATCH_SIZE
-            sess.run(tf.global_variables_initializer())
-            print('variables initialized')
+
             # initialise iterator with train data
             sess.run(self.train_init)
+
             print('Training...')
             start = time.time()
             for i in range(EPOCHS):
@@ -260,40 +306,35 @@ class StreetLearning:
                     _, loss_value = sess.run([self.train_op, self.loss])
                     tot_loss += loss_value
                 print("Iter: {}, Loss: {:.4f}".format(i, tot_loss / n_batches))
-                end_epoc = time.time()
-                print('This epoc took', end_epoc-start, 's')
-                sess.run(save_img_op)
-            end = time.time()
-            print('Training took', end-start, 's')
+                print('This epoch took', time.time()-start, 's')
+                #save epoch result
+                save_epoch_result_path = 'data/' + str(i) + 'seg_out.jpeg'
+                save_training_img_op = tf.write_file(save_epoch_result_path,img)
+                sess.run(save_training_img_op)
+            print('Training took', time.time()-start, 's')
 
             # initialise iterator with test data
             sess.run(self.test_init)
             self.training = False
+
             print('Test Loss: {:4f}'.format(sess.run(self.loss)))
-            sess.run(save_img_op)
+            # save test result
+            save_epoch_result_path = 'data/test_seg_out.jpeg'
+            save_test_img_op = tf.write_file(save_epoch_result_path,img)
+            sess.run(save_test_img_op)
 
     def testtest(self):
         img = scipy.misc.imread('data/kitti_data_road/train/targets/0.png', mode = 'RGB')
         label_reshaped = tf.reshape(img, self.input_dim)
         label_resized = tf.image.resize_images(label_reshaped, self.resized_dim)
-        #scipy.misc.imsave('data/testtest.png', img)
-        print('***fatto')
+        print('***testtest')
         #decode
         semantic_map = self.decode_label(label_resized)
         #encode
         color_image = self.encode_label(semantic_map)
-
-
         with tf.Session() as sess:
-            #magic_number_val = sess.run(magic_number)
             color_image_val = sess.run(color_image)
             scipy.misc.imsave('data/testtest.png', color_image_val)
-            '''train_len = len(glob.glob(os.path.join(self.train_img_path, '*')))
-            n_batches = train_len // BATCH_SIZE
-            sess.run(self.train_init)
-            for _ in range(n_batches):
-                sess.run(save_img_op)
-                input('go to next')'''
 
         print('LABEL')
 
