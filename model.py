@@ -13,7 +13,78 @@ def model(self):
     '''
     Function to build the neural net
     '''
+
+    '''
+    THIS SIMPLE MODLE WORKS
+    '''
     # Encode
+    conv1 = tf.layers.conv2d(inputs=self.features,
+                              filters=32,
+                              kernel_size=[3, 3],
+                              padding='SAME',
+                              activation=tf.nn.relu,
+                              trainable=self.training,
+                              name='conv1')
+    pool1 = tf.layers.max_pooling2d(inputs=conv1,
+                                    pool_size=[2, 2],
+                                    strides=2,
+                                    name='pool1')
+    conv2 = tf.layers.conv2d(inputs=pool1,
+                              filters=64,
+                              kernel_size=[3, 3],
+                              padding='SAME',
+                              activation=tf.nn.relu,
+                              trainable=self.training,
+                              name='conv2')
+    pool2 = tf.layers.max_pooling2d(inputs=conv2,
+                                    pool_size=[2, 2],
+                                    strides=2,
+                                    name='pool2')
+    conv3 = tf.layers.conv2d(inputs=pool2,
+                              filters=128,
+                              kernel_size=[3, 3],
+                              padding='SAME',
+                              activation=tf.nn.relu,
+                              trainable=self.training,
+                              name='conv3')
+    # Decode
+    unpool1 = tf.layers.conv2d_transpose(inputs=conv3,
+                                        filters=128,
+                                        kernel_size=[2, 2],
+                                        strides=(2,2),
+                                        padding='SAME',
+                                        activation=tf.nn.relu,
+                                        name='unpool1')
+    deconv1 = tf.layers.conv2d(inputs=unpool1,
+                              filters=64,
+                              kernel_size=[3, 3],
+                              padding='SAME',
+                              activation=tf.nn.relu,
+                              trainable=self.training,
+                              name='deconv1')
+    unpool2 = tf.layers.conv2d_transpose(inputs=deconv1,
+                                        filters=64,
+                                        kernel_size=[2, 2],
+                                        strides=(2,2),
+                                        padding='SAME',
+                                        activation=tf.nn.relu,
+                                        trainable=self.training,
+                                        name='unpool2')
+    deconv2 = tf.layers.conv2d(inputs=unpool2,
+                              filters=32,
+                              kernel_size=[3, 3],
+                              padding='SAME',
+                              activation=tf.nn.relu,
+                              trainable=self.training,
+                              name='deconv2')
+    self.segmentation_result = tf.layers.conv2d(inputs=deconv2,
+                              filters=self.n_classes,
+                              kernel_size=[1, 1],
+                              padding='SAME',
+                              activation=tf.sigmoid,
+                              trainable=self.training,
+                              name='deconv3')
+    '''# Encode
     # 1
     conv1_1 = tf.layers.conv2d(inputs=self.features,
                               filters=32,
@@ -122,4 +193,4 @@ def model(self):
                               activation=tf.sigmoid,
                               trainable=self.training,
                               name='deconv3')
-    self.segmentation_result = tf.nn.softmax(deconv3)
+    self.segmentation_result = tf.nn.softmax(deconv3)'''
