@@ -24,11 +24,13 @@ class StreetLearning:
         self.test_target_img_path = 'data/' + dataset_name + '/test/targets'
 
         self.input_dim =  [320, 1024,3]#[375,1242,3]#[28,28,3] #this must be the right size of the images
-        self.resized_dim = [80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
+        self.resized_dim = [320, 1024]#[80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
         #model
+        self.n_layers = 5
         self.keep_prob = tf.constant(0.75)
         self.training = False
         self.num_filters = 3
+        self.kernel = [5, 5]
         #label
         self.color_table = [[255,0,0],      # no_street
                             [255,0,255],    # street
@@ -122,153 +124,84 @@ class StreetLearning:
         Function to build the neural net
         '''
         # Encode
-        # e1
-        print('2**(self.num_filters + 0)', 2**(self.num_filters + 0))
-        conv1_1 = tf.layers.conv2d(inputs=self.features,
-                                  filters= 2**(self.num_filters + 0),
+        encode_model = {}
+        for l in range(self.n_layers):
+            if l == 0:
+                layer_input = self.features
+            else:
+                layer_input = encode_model['pool'+str(l-1)]
+            conv1 = tf.layers.conv2d(inputs=layer_input,
+                                      filters= 2**(self.num_filters + l),
+                                      kernel_size=self.kernel,
+                                      padding='SAME',
+                                      activation=tf.nn.relu,
+                                      trainable=self.training,
+                                      name='conv'+str(l)+'_1')
+            conv2 = tf.layers.conv2d(inputs=conv1,
+                                      filters=2**(self.num_filters + l),
+                                      kernel_size=self.kernel,
+                                      padding='SAME',
+                                      activation=tf.nn.relu,
+                                      trainable=self.training,
+                                      name='conv'+str(l)+'_2')
+            encode_model['conv'+str(l)] = conv2
+            pool = tf.layers.max_pooling2d(inputs=conv2,
+                                            pool_size=[2, 2],
+                                            strides=2,
+                                            name='pool'+str(l))
+            encode_model['pool'+str(l)] = pool
+
+
+        conv1 = tf.layers.conv2d(inputs=pool,
+                                  filters=2**(self.num_filters + (l+1)),
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
-                                  name='conv1_1')
-        conv1_2 = tf.layers.conv2d(inputs=conv1_1,
-                                  filters=2**(self.num_filters + 0),
+                                  name='conv'+str(l+1)+'_1')
+        conv2 = tf.layers.conv2d(inputs=conv1,
+                                  filters=2**(self.num_filters + (l+1)),
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
-                                  name='conv1_2')
-        pool1 = tf.layers.max_pooling2d(inputs=conv1_2,
-                                        pool_size=[2, 2],
-                                        strides=2,
-                                        name='pool1')
-        # e2
-        conv2_1 = tf.layers.conv2d(inputs=pool1,
-                                  filters=2**(self.num_filters + 1),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='conv2_1')
-        conv2_2 = tf.layers.conv2d(inputs=conv2_1,
-                                  filters=2**(self.num_filters + 1),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='conv2_2')
-        pool2 = tf.layers.max_pooling2d(inputs=conv2_2,
-                                        pool_size=[2, 2],
-                                        strides=2,
-                                        name='pool2')
-        # e3
-        conv3_1 = tf.layers.conv2d(inputs=pool2,
-                                  filters=2**(self.num_filters + 2),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='conv3_1')
-        conv3_2 = tf.layers.conv2d(inputs=conv3_1,
-                                  filters=2**(self.num_filters + 2),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='conv3_2')
-        pool3 = tf.layers.max_pooling2d(inputs=conv3_2,
-                                        pool_size=[2, 2],
-                                        strides=2,
-                                        name='pool3')
-        # e4
-        conv4_1 = tf.layers.conv2d(inputs=pool3,
-                                  filters=2**(self.num_filters + 3),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='conv4_1')
-        conv4_2 = tf.layers.conv2d(inputs=conv4_1,
-                                  filters=2**(self.num_filters + 3),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='conv4_2')
+                                  name='conv'+str(l+1)+'_2')
         # Decode
-        # d1
-        unpool1_temp = tf.layers.conv2d_transpose(inputs=conv4_2,
-                                            filters=2**(self.num_filters + 2),
-                                            kernel_size=[2, 2],
-                                            strides=(2,2),
-                                            padding='SAME',
-                                            activation=tf.nn.relu,
-                                            name='unpool1')
-        unpool1 = tf.concat([conv3_2, unpool1_temp], 3)
-        deconv1_1 = tf.layers.conv2d(inputs=unpool1,
-                                  filters=2**(self.num_filters + 2),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='deconv1_1')
-        deconv1_2 = tf.layers.conv2d(inputs=deconv1_1,
-                                  filters=2**(self.num_filters + 2),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='deconv1_2')
-        # d2
-        unpool2_temp = tf.layers.conv2d_transpose(inputs=deconv1_2,
-                                            filters=2**(self.num_filters + 1),
-                                            kernel_size=[2, 2],
-                                            strides=(2,2),
-                                            padding='SAME',
-                                            activation=tf.nn.relu,
-                                            trainable=self.training,
-                                            name='unpool2')
-        unpool2 = tf.concat([conv2_2, unpool2_temp], 3)
-        deconv2_1 = tf.layers.conv2d(inputs=unpool2,
-                                  filters=2**(self.num_filters + 1),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='deconv2_1')
-        deconv2_2 = tf.layers.conv2d(inputs=deconv2_1,
-                                  filters=2**(self.num_filters + 1),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='deconv2_2')
-        # d3
-        unpool3_temp = tf.layers.conv2d_transpose(inputs=deconv2_2,
-                                            filters=2**(self.num_filters + 0),
-                                            kernel_size=[2, 2],
-                                            strides=(2,2),
-                                            padding='SAME',
-                                            activation=tf.nn.relu,
-                                            trainable=self.training,
-                                            name='unpool3')
-        unpool3 = tf.concat([conv1_2, unpool3_temp], 3)
-        deconv3_1 = tf.layers.conv2d(inputs=unpool3,
-                                  filters=2**(self.num_filters + 0),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='deconv3_1')
-        deconv3_2 = tf.layers.conv2d(inputs=deconv3_1,
-                                  filters=2**(self.num_filters + 0),
-                                  kernel_size=[3, 3],
-                                  padding='SAME',
-                                  activation=tf.nn.relu,
-                                  trainable=self.training,
-                                  name='deconv3_2')
+        decode_model = {}
+        for l in range(self.n_layers-1,-1,-1):#range(self.n_layers):
+            print(l)
+            if l == self.n_layers-1:
+                layer_input = conv2
+            else:
+                layer_input = decode_model[str(l+1)]
+            print('input',layer_input)
+            unpool_temp = tf.layers.conv2d_transpose(inputs=layer_input,
+                                                filters=2**(self.num_filters + l),
+                                                kernel_size=[2, 2],
+                                                strides=(2,2),
+                                                padding='SAME',
+                                                activation=tf.nn.relu,
+                                                name='unpool'+str(l))
+            unpool = tf.concat([encode_model['conv'+str(l)], unpool_temp], 3, name='concat'+str(l))
+            deconv1 = tf.layers.conv2d(inputs=unpool,
+                                      filters=2**(self.num_filters + l),
+                                      kernel_size=self.kernel,
+                                      padding='SAME',
+                                      activation=tf.nn.relu,
+                                      trainable=self.training,
+                                      name='deconv'+str(l)+'_1')
+            deconv2 = tf.layers.conv2d(inputs=deconv1,
+                                      filters=2**(self.num_filters + l),
+                                      kernel_size=self.kernel,
+                                      padding='SAME',
+                                      activation=tf.nn.relu,
+                                      trainable=self.training,
+                                      name='deconv'+str(l)+'_2')
+            decode_model[str(l)] = deconv2
+            print('output',deconv2)
+
         # Sigmoid
-        self.segmentation_result = tf.layers.conv2d(inputs=deconv3_2,
+        self.segmentation_result = tf.layers.conv2d(inputs=deconv2,
                                   filters=self.n_classes,
                                   kernel_size=[1, 1],
                                   padding='SAME',

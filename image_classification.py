@@ -14,11 +14,11 @@ BATCH_SIZE = 2#16
 class StreetLearning:
     def __init__(self):
         #dataaset
-        dataset_name = 'einstein' #'kitti_data_road'
-        self.train_img_path = 'data/' + dataset_name + '/trainingtraining/inputs'
-        self.train_target_img_path = 'data/' + dataset_name + '/trainingtraining/targets'
-        self.test_img_path = 'data/' + dataset_name + '/testingtesting/inputs'
-        self.test_target_img_path = 'data/' + dataset_name + '/testingtesting/targets'
+        dataset_name = 'einstein'#'kitti_data_road'
+        self.train_img_path = 'data/' + dataset_name + '/train/inputs'
+        self.train_target_img_path = 'data/' + dataset_name + '/train/targets'
+        self.test_img_path = 'data/' + dataset_name + '/test/inputs'
+        self.test_target_img_path = 'data/' + dataset_name + '/test/targets'
 
         self.input_dim = [28,28,3] #[1242,375,3] #this must be the right size of the images
         self.resized_dim = [28,28]#[92,28]
