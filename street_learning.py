@@ -24,7 +24,7 @@ class StreetLearning:
         self.test_target_img_path = 'data/' + dataset_name + '/test/targets'
 
         self.input_dim =  [320, 1024,3]#[375,1242,3]#[28,28,3] #this must be the right size of the images
-        self.resized_dim = [320, 1024]#[80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
+        self.resized_dim = [80, 256]#[80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
         #model
         self.n_layers = 5
         self.keep_prob = tf.constant(0.75)
