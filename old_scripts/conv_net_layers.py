@@ -35,10 +35,13 @@ class ConvNet(object):
             # reshape the image to make it work with tf.nn.conv2d
 
             self.train_init = iterator.make_initializer(train_data)  # initializer for train_data
-            self.test_init = iterator.make_initializer(test_data)    # initializer for train_data
+            self.test_init = iterator.make_initializer(test_data)    # initializer for test_data
 
     def inference(self):
-        conv1 = tf.layers.conv2d(inputs=self.img,
+        net = tf.layers.dense(self.img, 8, activation=tf.tanh) # pass the first value from iter.get_next() as input
+        net = tf.layers.dense(net, 8, activation=tf.tanh)
+        self.logits = tf.layers.dense(net, self.n_classes, activation=tf.tanh)
+        '''conv1 = tf.layers.conv2d(inputs=self.img,
                                   filters=32,
                                   kernel_size=[5, 5],
                                   padding='SAME',
@@ -67,7 +70,7 @@ class ConvNet(object):
                                     self.keep_prob,
                                     training=self.training,
                                     name='dropout')
-        self.logits = tf.layers.dense(dropout, self.n_classes, name='logits')
+        self.logits = tf.layers.dense(dropout, self.n_classes, name='logits')'''
 
     def loss(self):
         '''
