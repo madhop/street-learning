@@ -9,13 +9,13 @@ import numpy as np
 import random
 import scipy.misc
 
-EPOCHS = 2#40
+EPOCHS = 30
 BATCH_SIZE = 16
 
 class StreetLearning:
     def __init__(self):
         #optimizer
-        self.learning_rate=0.1
+        self.learning_rate=0.01
         #dataset
         dataset_name = 'CityScapesPiccolo'#'kitti_data_road' #'einstein'
         self.train_img_path = 'data/' + dataset_name + '/train/inputs'
@@ -25,12 +25,12 @@ class StreetLearning:
 
         self.channels = 3
         self.input_dim =  [1024, 2048, 3]#[320, 1024,3]#[375,1242,3]#[28,28,3] #this must be the right size of the images
-        self.resized_dim = [64, 128]#[80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
+        self.resized_dim = [64, 128]#[64, 128]#[80, 256]#[160, 512]#[28,92]#[28,92]#[28,28]
         #model
-        self.n_layers = 1
+        self.n_layers = 2
         self.keep_prob = tf.constant(0.75)
-        self.training = False
-        self.num_filters = 6
+        self.training = True
+        self.num_filters_exponent = 5
         self.kernel = [3, 3]
         #label
         self.color_table = [[255,255,255],    # street
@@ -110,7 +110,7 @@ class StreetLearning:
         train_dataset = tf.data.Dataset.from_tensor_slices(train_data)
         train_dataset = train_dataset.map(self._parse_function).batch(BATCH_SIZE).repeat()
         test_dataset = tf.data.Dataset.from_tensor_slices(test_data)
-        test_dataset = test_dataset.map(self._parse_function).batch(test_data[0].shape[0]).repeat()
+        test_dataset = test_dataset.map(self._parse_function).batch(BATCH_SIZE).repeat() #test_data[0].shape[0]
 
         #iterator
         iterator = tf.data.Iterator.from_structure(train_dataset.output_types,train_dataset.output_shapes)
@@ -132,14 +132,14 @@ class StreetLearning:
             else:
                 layer_input = encode_model['pool'+str(l-1)]
             conv1 = tf.layers.conv2d(inputs=layer_input,
-                                      filters= 2**(self.num_filters + l),
+                                      filters= 2**(self.num_filters_exponent + l),
                                       kernel_size=self.kernel,
                                       padding='SAME',
                                       activation=tf.nn.relu,
                                       trainable=self.training,
                                       name='conv'+str(l)+'_1')
             conv2 = tf.layers.conv2d(inputs=conv1,
-                                      filters=2**(self.num_filters + l),
+                                      filters=2**(self.num_filters_exponent + l),
                                       kernel_size=self.kernel,
                                       padding='SAME',
                                       activation=tf.nn.relu,
@@ -154,14 +154,14 @@ class StreetLearning:
 
 
         conv1 = tf.layers.conv2d(inputs=pool,
-                                  filters=2**(self.num_filters + (l+1)),
+                                  filters=2**(self.num_filters_exponent + (l+1)),
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
                                   trainable=self.training,
                                   name='conv'+str(l+1)+'_1')
         conv2 = tf.layers.conv2d(inputs=conv1,
-                                  filters=2**(self.num_filters + (l+1)),
+                                  filters=2**(self.num_filters_exponent + (l+1)),
                                   kernel_size=[3, 3],
                                   padding='SAME',
                                   activation=tf.nn.relu,
@@ -175,7 +175,7 @@ class StreetLearning:
             else:
                 layer_input = decode_model[str(l+1)]
             unpool_temp = tf.layers.conv2d_transpose(inputs=layer_input,
-                                                filters=2**(self.num_filters + l),
+                                                filters=2**(self.num_filters_exponent + l),
                                                 kernel_size=[2, 2],
                                                 strides=(2,2),
                                                 padding='SAME',
@@ -183,14 +183,14 @@ class StreetLearning:
                                                 name='unpool'+str(l))
             unpool = tf.concat([encode_model['conv'+str(l)], unpool_temp], 3, name='concat'+str(l))
             deconv1 = tf.layers.conv2d(inputs=unpool,
-                                      filters=2**(self.num_filters + l),
+                                      filters=2**(self.num_filters_exponent + l),
                                       kernel_size=self.kernel,
                                       padding='SAME',
                                       activation=tf.nn.relu,
                                       trainable=self.training,
                                       name='deconv'+str(l)+'_1')
             deconv2 = tf.layers.conv2d(inputs=deconv1,
-                                      filters=2**(self.num_filters + l),
+                                      filters=2**(self.num_filters_exponent + l),
                                       kernel_size=self.kernel,
                                       padding='SAME',
                                       activation=tf.nn.relu,
@@ -247,6 +247,8 @@ class StreetLearning:
 
             # initialise iterator with train data
             sess.run(self.train_init)
+
+            print(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
 
             print('Training...')
             start = time.time()
